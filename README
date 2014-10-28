@@ -1,0 +1,119 @@
+
+flash-bench
+
+Synopsis
+
+flash-bench [OPTIONS] [TEST]|[TESTSHORTHANDS] [TEST]...
+
+Description
+
+flash-bench is a disk and file system benchmark for testing various access patterns, such as sequential read or write access, random read or write access, and access patterns stored in a trace. Although specifically relevant for flash memory-based storage such as SSD drives, USB sticks, SD cards and other memory cards, it also works with traditional hard-disk drives, RAM disk or any kind of file system that allows read or write access to a single file, or is represented as a block device.
+
+It can be used as a storage device, file system or real-world disk access benchmark, with or without use traces, and with or without the effects of OS disk caching. It can be used a low-level disk access benchmark when instructed to minimize OS cache effects or use direct or synchronous access.
+
+The program is best run as superuser, mainly because emptying of the Linux buffer cache is a priviledged operation. Otherwise, cache effects will usually skew the results.
+
+Options:
+
+-b, --block-device=[PATHNAME]
+
+Use a block device, such as the block device representing a flash storage drive, as the test device using direct access. Note that when a block device is specified, any benchmark involving write access will corrupt and destroy the data present on the drive.
+
+-i, --direct
+
+By default, flash-bench does not use the O_DIRECT access mode flag to minimize cache effects, so that the benefits of the OS buffer cache exist as they would in a real-world scenario. However, for low-level testing, this option can be specified and the O_DIRECT flag will be used, minimizing OS cache effects. This option has no effect on trace file tests; use --trace-direct instead.
+
+-d, --duration=[DURATION]
+
+Set the target duration of each benchmark test. This is only a minimum duration and the test may take considerably longer if it is slow. Can be used in combination with --size. The default is 30 seconds. Has no effect for trace file tests.
+
+-f, --file=[PATHNAME]
+
+Set the filename of the test file used for benchmarking. The default filename is flashbench.tmp. If it does not exist, the file will be created. For safety, block devices are detected and not allowed, use the --block-device option instead.
+
+-h, --help
+
+Display help.
+
+-n, --no-duration
+
+Do not enforce a target maximum duration for each test.
+
+-o, --random-seed=[VALUE]
+
+Seed the C library random number generator with a specific value instead of using a seed of 0. VALUE should be an integer, however --random-seed=time will cause the random seed to be derived from system time so that it will be a different for each run.
+
+-r, --range=[SIZE]
+
+Set the size in bytes of the range, starting from the beginning of the test file, that will be used in the benchmark tests. When not specified, 512 MB (512 megabytes) is the default, unless the test file already exists and is already larger than 512 MB, in which case the entire range of the file will be used.
+
+-s, --size=[SIZE]
+
+Set the maximum total size in bytes of the transactions performed for each benchmark test. Has no effect for trace file tests.
+
+-y, --sync
+
+Use synchronous I/O for disk access. Corresponds to the C library O_SYNC access mode flag that will in principle block until the data has been physically written to the underlying hardware. See the man page for the open(2) C library function for details.
+
+-v, --trace-direct
+
+Use the O_DIRECT access mode flag for trace file benchmark tests. Equivalent to the --direct option, but only applies to trace file tests.
+
+-u, --trace-duration=[DURATION]
+
+Set the target maximum duration of trace benchmark tests.
+
+Units used with --range, --size, --duration and --trace-duration options:
+
+SIZE is an integer and optional unit (for example, 10M is 10 * 1024 * 1024 bytes). Units are K (kilobytes, 1024), M (megabytes, 1024 ^ 2), G (gigabytes, 1024 ^ 3) and T (terabytes, 1024 ^ 4).
+
+DURATION is an integer and mandatory unit representing a duration (for example, 30s is 30 seconds). Units are s (seconds), m (minutes, 60 seconds), and h (hours, 3600 seconds).
+
+Tests:
+
+Benchmark test names, including trace file tests, are optionally specified as space-delimited arguments at the end of the commmand line. When no test names are specified, and no trace file tests have been specified, the complete set of access benchmarks will be executed. Tests can also be specified as one or more arguments of shorthand character strings, for which each character must correspond to a test shorthand character.
+
+To reduce cache effects, except in the case of trace file tests, each block in the test file is only accessed once, so a large test file (e.g. 512 MB or larger) is required to achieve longer test time.
+
+seqrd (shorthand character: r)
+
+Sequential read access. The entire test file range is read in sequential order, although the test may terminate early if maximum test time is exceeded.
+
+seqwr (shorthand character: w)
+
+Sequential write access. The entire test file range is read in sequential order, although the test may terminate early if maximum test time is exceeded.
+
+rndrd (shorthand character: R)
+
+Random read access. Each block within the test file range is read in a completely random order, although the test may terminate early if maximum test time is exceeded. The random order is deterministic (it will be exactly the same between runs), unless the --random-seed option is specified.
+
+rndwr (shorthand character: W)
+
+Random write access. Each block within the test file range is read in a completely random order, although the test may terminate early when the maximum test time is exceeded.
+
+trace=[PATHNAME]
+
+Add a trace file benchmark test. A trace file is simple, possibly prerecorded, list of disk transactions consisting of operation type (read or write), location on the disk, and size. While location and size will often always be aligned on a 4K block boundary, this is not mandatory. Normally, the entire trace is tested, and --duration and --size have no effect; a target maximum duration for traces can be specified with --trace-duration. Multiple traces can be specified. The file format of the trace file is described below.
+
+
+Examples:
+
+sudo flash-bench --size=128M --range=512M rndrd rndwr
+
+Run random access tests with 128MB worth of data, using 128MB of the default test file, creating it if required. The default maximum target duration of 30 seconds is enforced.
+
+sudo flash-bench --duration=15s --size=512M rwRW
+
+Run sequential and random access tests (total four tests) with 512MB worth of data, using 512MB (default range) of the default test file, with a maximum target duration	of 15s.
+
+
+Trace file format:
+
+The trace file format consists of a sequential array of transactions in three possible formats, which may be mixed:
+
+1. An 8-byte format using 4K block units. The first four bytes consist of a 32-bit unsigned integer (in LSB byte-order) of which the uppermost bit (bit 31) is zero. Bit 30 determines the transaction type (0 = read, 1 = write), while the lowest order 30 bits define the size of the transaction in units of 4K blocks (which limits the maximum size to less than 4096 GB or 4 TB). The last four bytes define a 32-bit unsigned integer representing the location of the transaction as an offset in units of 4K blocks from the start of the file or device (giving a range of 16 terabytes).
+
+2. An 8-byte format with byte-specific transaction size precision. The first four bytes consist of a 32-bit unsigned integer (LSB byte-order) of which the uppermost bit (bit 31) is one and bit 30 is zero. Bit 29 determines the transaction type (0 = read, 1 = write), while the lowest order 29 bits define the location of the transaction in 4K block units, giving a range of 4 terabytes. The last four bytes define the size of the transaction in bytes (which limits the maximum size to less than 4 GB).
+
+3. A 16-byte format with high precision and virtually unlimited range. The first eight bytes consist of a 64-bit unsigned integer (LSB byte-order) of which the uppermost bit (bit 63) is one and bit 62 is also one. Bit 61 determines the transaction type (0 = read, 1 = write), while the lowest order 61 bits define the size of the transaction in bytes. The last eight bytes consist of a 64-bit unsigned integer defining the location of the transaction in bytes.
+
