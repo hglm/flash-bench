@@ -35,7 +35,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "dynamic-array.h"
 #include "timer.h"
 
-static const struct option long_options[] {
+static const struct option long_options[] = {
 	// Option name, argument flag, NULL, equivalent short option character.
 	{ "block-device", required_argument, NULL, 'b' },
 	{ "direct", no_argument, NULL, 'i' },
@@ -146,19 +146,19 @@ static int RoundToMB(int64_t nu_bytes) {
 }
 
 static void Usage() {
-	Message("flashbench v%d.%d\n", VERSION_MAJOR, VERSION_MINOR);
+	Message("flash-bench v%d.%d\n", VERSION_MAJOR, VERSION_MINOR);
 	Message("Usage: flash-bench [OPTIONS] [TESTNAME]|[TESTSHORTHAND] [TESTNAME]...\n\n");
 
 	Message("Options:\n");
 	for (int i = 0;; i++) {
 		if (long_options[i].name == NULL)
 			break;
-		const char *value_str;
+		const char *value_str = " [VALUE]";
 		if (long_options[i].has_arg)
-			value_str = "=[VALUE]";
+			Message("    -%c%s, --%s%s, --%s=%s\n", long_options[i].val, value_str,
+				long_options[i].name, value_str, long_options[i].name, &value_str[1]);
 		else
-			value_str = "";
-		Message("    -%c, --%s%s\n", long_options[i].val, long_options[i].name, value_str);
+			Message("    -%c, --%s\n", long_options[i].val, long_options[i].name);
 	}
 
 	Message("\nAvailable benchmark tests:\n"
@@ -166,13 +166,19 @@ static void Usage() {
 	for (int i = 0; i < NU_TESTS; i++)
 		Message("      %-3c  %-16s  %s\n", test[i].command_ch, test[i].name, test[i].description);
 	Message("           trace=[FILENAME]  Replay a trace file\n");
-	
-	Message("\nExample: flash-bench --size=128M --range=512M rndrd rndwr\n"
+
+	Message(" \nExample: flash-bench\n"
+		"    Run all tests (sequential read and write, random read and write)\n"
+		"    using a default range/size of 512MB, creating a test file of size\n"
+		"    512 MB if not already present and a default target duration of 60\n"
+		"    seconds per test.\n");
+
+	Message("\nExample: flash-bench --size 128M --range 512M rndrd rndwr\n"
 		"    Run random access tests with 128MB worth of data, using\n"
 		"    128MB of the default test file, creating it if required.\n"
-		"    The default maximum target duration of 30 seconds is enforced.\n");
+		"    The default maximum target duration of 60 seconds is enforced.\n");
 
-	Message("\nExample: flash-bench --duration=15s --size=512M rwRW\n"
+	Message("\nExample: flash-bench --duration 15s --size 512M rwRW\n"
 		"    Run sequential and random access tests (total four tests)\n"
 		"    with 512MB worth of data, using %dMB (default range) of the\n"
 		"    default test file, with a maximum target duration of 15s.\n",
@@ -598,7 +604,7 @@ static int ExecuteTrace(Trace *trace, ThreadedTimeout *tt) {
 	int fd = open(test_filename, O_RDWR | extra_mode_access_flags_trace);
 	CheckFDError(fd);
 	int nu_blocks_processed = 0;
-	int last_4MB_chunk = 0;
+	uint64_t total_size = 0;
 	for (;;) {
 		if (trace_bindex >= trace->size)
 			break;
@@ -640,6 +646,7 @@ static int ExecuteTrace(Trace *trace, ThreadedTimeout *tt) {
 			size_in_blocks = size / 4096;
 			tail_size = size & 0xFFF;
 		}
+		total_size += size_in_blocks * 4096 + head_size + tail_size;
 		lseek(fd, (off_t)location, SEEK_SET);
 		// Handle head.
 		if (head_size > 0) {
@@ -662,7 +669,7 @@ static int ExecuteTrace(Trace *trace, ThreadedTimeout *tt) {
 				write_with_check(fd, buffer, tail_size);
 			else
 				read_with_check(fd, buffer, tail_size);
-			nu_blocks_processed;
+			nu_blocks_processed++;
 		}
 		// When there is a set trace duration, check it.
 		if (FlagIsSet(FLAG_TRACE_DURATION))
@@ -670,7 +677,10 @@ static int ExecuteTrace(Trace *trace, ThreadedTimeout *tt) {
 				break;
 	}
 	close(fd);
-	return nu_blocks_processed;
+	// We can report nu_blocks_processed (which counts every head or tail, even a few bytes,
+	// as one 4K block, or use the total transaction size in bytes divided by the block size
+	// (which we do).
+	return total_size / 4096;
 }
 
 int main(int argc, char *argv[]) {

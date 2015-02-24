@@ -25,7 +25,7 @@ By default, flash-bench does not use the O_DIRECT access mode flag to minimize c
 
 -d, --duration=[DURATION]
 
-Set the target duration of each benchmark test. This is only a minimum duration and the test may take considerably longer if it is slow. Can be used in combination with --size. The default is 30 seconds. Has no effect for trace file tests.
+Set the target duration of each benchmark test. This is only a minimum duration and the test may take considerably longer if it is slow. Can be used in combination with --size. The default is 60 seconds. Has no effect for trace file tests.
 
 -f, --file=[PATHNAME]
 

@@ -16,7 +16,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 */
 
-// Return current system time/date in seconds (double floating point format)
+// Return current system time/date in cumulative microseconds
 
 inline uint64_t GetCurrentTimeUSec() {
     struct timeval tv;
@@ -24,11 +24,13 @@ inline uint64_t GetCurrentTimeUSec() {
     return tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
-// Return current system time/date in cumulative microseconds
+// Return current system time/date in seconds (double floating point format)
 
 inline double GetCurrentTime() {
     return (double)GetCurrentTimeUSec() * 0.000001d;
 }
+
+// Simple time measurement between two moments.
 
 class Timer {
 private :
